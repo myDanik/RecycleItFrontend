@@ -1,5 +1,5 @@
 {
-  "name": "my-app",
+  "name": "recycleit",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,8 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "jwt-decode": "^4.0.0",
+    "leaflet": "^1.9.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^6.30.2"
   },
   "devDependencies": {
