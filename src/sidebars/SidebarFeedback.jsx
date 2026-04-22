@@ -18,7 +18,7 @@ export default function SidebarFeedback() {
 
     const user = api.getCurrentUser();
   if (!user) {
-    navigate("/sidebar/auth");
+    navigate("/sidebar/login");
     return;
   }
 

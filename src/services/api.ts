@@ -1,11 +1,12 @@
 const API_URL = "http://localhost:8000";
 
 const api = {
-  async request(endpoint: string, options: RequestInit = {}) {
+  async request(endpoint: string, options: RequestInit = {}, retry: boolean = true): Promise<any> {
     const url = `${API_URL}${endpoint}`;
     const token = localStorage.getItem("access_token");
+    const isFormData = options.body instanceof FormData;
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(options.headers as Record<string, string>),
     };
     if (token) {
@@ -19,11 +20,13 @@ const api = {
         throw { status: 403, message: "Недостаточно прав доступа" };
       }
 
-      if (response.status === 401) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user");
-        window.location.href = "/login";
-        throw { status: 401, message: "Сессия истекла, войдите снова" };
+      if (response.status === 401 && retry) {
+        const refreshed = await this.refreshAccessToken();
+        if (refreshed) {
+          return this.request(endpoint, options, false);
+        }
+        window.location.href = "/sidebar/login";
+        throw { status: 401, message: "Сессия истекла" };
       }
 
       if (!response.ok) {
@@ -52,8 +55,8 @@ const api = {
       method: "POST",
       body: JSON.stringify(credentials),
     });
-    console.log(data);
     localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem("refresh_token", data.refresh_token)
     localStorage.setItem("user", JSON.stringify({
       id: data.id,
       username: data.username,
@@ -62,6 +65,38 @@ const api = {
 
     return data;
   },
+
+    logout() {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
+    window.location.href = "/sidebar/login";
+  },
+
+  async refreshAccessToken(): Promise<boolean> {
+  const refresh_token = localStorage.getItem("refresh_token");
+  if (!refresh_token) return false;
+
+  try {
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token }),
+    });
+
+    if (!response.ok) {
+      this.logout();
+      return false;
+    }
+
+    const data = await response.json();
+    localStorage.setItem("access_token", data.access_token);
+    return true;
+  } catch {
+    this.logout();
+    return false;
+  }
+},
 
   getCurrentUser() {
     const stored = localStorage.getItem("user");
@@ -74,7 +109,6 @@ const api = {
 
   isAdmin() {
     const user = this.getCurrentUser();
-    console.log(user);
     return user?.role === "admin";
   },
 
@@ -82,7 +116,7 @@ const api = {
     const params = new URLSearchParams();
     if (filters.q) params.append("q", filters.q);
     if (filters.waste_type) params.append("waste_type", filters.waste_type);
-    if (filters.open_now !== undefined) params.append("open_now", filters.open_now);
+    if (filters.open_now) params.append("open_now", filters.open_now);
     if (filters.skip) params.append("skip", filters.skip);
     if (filters.limit) params.append("limit", filters.limit);
     const query = params.toString();
@@ -109,6 +143,21 @@ const api = {
 
   async deletePoint(id: number) {
     return this.request(`/points/${id}`, { method: "DELETE" });
+  },
+
+  async uploadPointPhoto(pointId: number, file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    const response = this.request(`/points/${pointId}/photo`, {
+    method: "POST",
+    body: form,
+    headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+    });
+    return response;
+  },
+
+  async deletePointPhoto(pointId: number) {
+    return this.request(`/points/${pointId}/photo`, { method: "DELETE" });
   },
 
   async getFeedback(pointId: number | null = null) {

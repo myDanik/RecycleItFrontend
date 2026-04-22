@@ -1,96 +1,65 @@
-import React, { useState, useEffect } from "react";
+import { useFilterState } from "../hooks/useFilterState";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
-import Map from "./Map";
+const Map = lazy(() => import("./Map"));
 import api from "../services/api";
 
 export default function Layout() {
   const [points, setPoints] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(false);
   const location = useLocation();
-
-
+  const { filters } = useFilterState();
   const getSelectedPointId = () => {
-    const path = location.pathname;
-    const match = path.match(/\/info\/(\d+)/);
+    const match = location.pathname.match(/\/info\/(\d+)/);
     return match ? parseInt(match[1]) : null;
   };
 
+
   useEffect(() => {
     loadPoints();
-  }, [searchQuery]);
+  }, [filters.q, filters.waste_type, filters.open_now, filters.limit, filters.page]);
+
 
   async function loadPoints() {
     setLoading(true);
     try {
-      const data = await api.getPoints({ q: searchQuery || undefined });
+      const data = await api.getPoints({
+        q:          filters.q || undefined,
+        waste_type: filters.waste_type || undefined,
+        open_now:   filters.open_now || undefined,
+        limit:      filters.limit,
+        skip:       ((Number(filters.page) || 1) - 1) * (Number(filters.limit) || 10),
+      });
       setPoints(data);
     } catch (err) {
-      console.error("Ошибка загрузки пунктов:", err);
-      setPoints([
-        {
-          id: 1,
-          name: "Эко-центр на Красной площади",
-          address: "Красная площадь, 1",
-          waste_types: ["бумага", "пластик", "стекло"],
-          opens_at: "09:00:00",
-          closes_at: "21:00:00"
-        },
-        {
-          id: 2,
-          name: "Пункт приема на Арбате",
-          address: "ул. Арбат, 25",
-          waste_types: ["пластик", "металл"],
-          opens_at: "08:00:00",
-          closes_at: "20:00:00"
-        },
-        {
-          id: 3,
-          name: "Китай-город Эко",
-          address: "ул. Варварка, 10",
-          waste_types: ["стекло", "бумага"],
-          opens_at: "10:00:00",
-          closes_at: "22:00:00"
-        },
-        {
-          id: 4,
-          name: "Пресня Ресайклинг",
-          address: "ул. Пресненская, 15",
-          waste_types: ["пластик", "стекло", "металл"],
-          opens_at: "08:30:00",
-          closes_at: "19:30:00"
-        }
-      ]);
+      console.error("Ошибка загрузки:", err);
     } finally {
       setLoading(false);
     }
   }
 
-  const handleSearchChange = (query) => {
-    setSearchQuery(query);
-  };
-
   return (
     <div className="app-root">
       <div className="page-top">
-        <Header onSearchChange={handleSearchChange} />
+        <Header/>
       </div>
 
       <div className="content-row">
         <aside className="map-area">
-          <Map 
-            points={points} 
-            selectedPointId={getSelectedPointId()} 
-          />
+          <Suspense fallback={<div style={{ height: 400 }}>Загрузка карты...</div>}>
+            <Map 
+              points={points} 
+              selectedPointId={getSelectedPointId()} 
+            />
+          </Suspense>
         </aside>
 
         <section className="sidebar-area">
           <Outlet context={{ 
             points, 
             loading, 
-            reloadPoints: loadPoints,
-            searchQuery 
+            reloadPoints: loadPoints
           }} />
         </section>
       </div>

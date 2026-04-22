@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 
 export default function Header({ onSearchChange }) {
@@ -7,6 +7,7 @@ export default function Header({ onSearchChange }) {
   const [query, setQuery] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const navigate = useNavigate();
+  const { search } = useLocation();
 
   const isAdmin = api.isAdmin();
 
@@ -16,11 +17,8 @@ export default function Header({ onSearchChange }) {
     
   }, []);
   function handleLogout() {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
+    api.logout()
     setIsLoggedIn(false);
-    navigate("/sidebar/main");
     window.location.reload();
   }
 
@@ -80,15 +78,12 @@ export default function Header({ onSearchChange }) {
           </div>
         ) : (
           <>
-            <button className="control-btn" onClick={openSearch} aria-label="Открыть поиск">
-              Поиск 🔍
-            </button>
 
             <Link to="/sidebar/main" className="control-btn" aria-label="Открыть список">
               Список ☰
             </Link>
 
-            <Link to="/sidebar/filters" className="control-btn" aria-label="Открыть фильтры">
+            <Link to={{ pathname: "/sidebar/filters", search }} className="control-btn" aria-label="Открыть фильтры">
               Фильтры
             </Link>
 
@@ -103,7 +98,7 @@ export default function Header({ onSearchChange }) {
                 Выйти
               </button>
             ) : (
-              <Link to="/sidebar/auth" className="control-btn" aria-label="Войти или зарегистрироваться">
+              <Link to="/sidebar/login" className="control-btn" aria-label="Войти или зарегистрироваться">
                 Войти
               </Link>
             )}
